@@ -86,7 +86,7 @@ $(XOLOTL_DEPEND_LIBS): $(XOLOTL_DIR)/xolotl/xolotlSolver/Solver.cpp
 	cd xolotl; \
 	mkdir build; \
 	cd build; \
-	PETSC_DIR=$(PETSC_DIR) PETSC_ARCH=$(PETSC_ARCH) HDF5_ROOT=$(PETSC_DIR)/$(PETSC_ARCH) \
+	PETSC_DIR=$(PETSC_DIR) PETSC_ARCH=$(PETSC_ARCH) \
 	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=mpicxx \
 	-DBUILD_SHARED_LIBS=yes -DCMAKE_CXX_FLAGS_RELEASE="-o3 -fPIC" ../xolotl; \
 	make; make install \
