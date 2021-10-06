@@ -7,56 +7,48 @@
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
-#ifndef XOLOTLPROBLEM_H
-#define XOLOTLPROBLEM_H
+#ifndef XOLOTLNETWORKPROBLEM_H
+#define XOLOTLNETWORKPROBLEM_H
 
 #include "ExternalProblem.h"
 #include "coupling_xolotlApp.h"
 
-class XolotlProblem;
+class XolotlNetworkProblem;
 
 template<>
-InputParameters validParams<XolotlProblem>();
+InputParameters validParams<XolotlNetworkProblem>();
 
 /**
  * This is an interface to call an external solver
  */
-class XolotlProblem: public ExternalProblem {
+class XolotlNetworkProblem: public ExternalProblem {
 public:
-	XolotlProblem(const InputParameters &params);
-	~XolotlProblem() {
-		_interface->finalizeXolotl();
+	XolotlNetworkProblem(const InputParameters &params);
+	~XolotlNetworkProblem() {
+		_networkInterface->finalizeXolotl();
 	}
 
 	virtual void externalSolve() override;
-	virtual void syncSolutions(Direction /*direction*/) override;
-
 	virtual bool converged() override;
+	virtual void syncSolutions(Direction /*direction*/) override {return;}
 
 	// Methods for restart
 	void saveState();
 	void setState();
 
 private:
-/// The name of the variable to transfer to
-	const VariableName &_sync_rate;
-	const VariableName &_sync_gb;
-	const VariableName &_sync_mono;
-	const VariableName &_sync_frac;
-	std::shared_ptr<XolotlInterface> _interface;
-	Real _dt_for_derivative;
-	std::vector<std::vector<std::vector<Real> > > &_old_rate;
-	std::vector<int> _gb_list;
+	/// The path to the input file for Xolotl
+	FileName _network_xolotl_filename;
+	std::shared_ptr<XolotlInterface> _networkInterface;
+	std::vector<std::shared_ptr<XolotlInterface> > _subInterfaces;
+	std::vector<xolotl::IdType> _subDOFs;
 	Real &_current_time;
-	bool _xolotl_has_run;
 
 	// Variables for restart
 	Real &_current_dt;
 	Real &_previous_time;
-	Real &_n_xenon;
-	std::vector<std::vector<std::vector<std::array<Real, 4> > > > &_local_NE;
 	std::vector<std::vector<std::vector<std::vector<std::pair<xolotl::IdType, Real> > > > > &_conc_vector;
 
 };
 
-#endif /* XOLOTLPROBLEM_H */
+#endif /* XOLOTLNETWORKPROBLEM_H */

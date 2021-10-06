@@ -2,7 +2,7 @@
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
-#include "XolotlProblem.h"
+#include "XolotlNetworkProblem.h"
 #include "Executioner.h"
 #include "ModulesApp.h"
 
@@ -17,7 +17,7 @@ InputParameters coupling_xolotlApp::validParams() {
 }
 
 coupling_xolotlApp::coupling_xolotlApp(InputParameters parameters) :
-		MooseApp(parameters), _interface(std::make_shared<XolotlInterface>()), _is_xolotl_app(
+		MooseApp(parameters), _is_xolotl_app(
 				false) {
 	coupling_xolotlApp::registerAll(_factory, _action_factory, _syntax);
 }
@@ -25,14 +25,20 @@ coupling_xolotlApp::coupling_xolotlApp(InputParameters parameters) :
 coupling_xolotlApp::~coupling_xolotlApp() {
 }
 
-void coupling_xolotlApp::createInterface(FileName paramName) {
-	int argc = 2;
-	const char* argv[argc + 1];
-	std::string fakeAppName = "bla";
-	argv[0] = fakeAppName.c_str();
-	argv[1] = paramName.c_str();
+void coupling_xolotlApp::createInterfaces(std::vector<FileName> paramNames) {
+	_interfaces.clear();
+	// Loop on the number of parameter files
+	for (auto name : paramNames) {
+		_interfaces.push_back(std::make_shared<XolotlInterface>());
 
-	_interface->initializeXolotl(argc, argv, _comm->get());
+		int argc = 2;
+		const char *argv[argc + 1];
+		std::string fakeAppName = "subXolotl";
+		argv[0] = fakeAppName.c_str();
+		argv[1] = name.c_str();
+
+		(_interfaces.back())->initializeXolotl(argc, argv, _comm->get());
+	}
 
 	_is_xolotl_app = true;
 }
@@ -53,8 +59,8 @@ std::shared_ptr<Backup> coupling_xolotlApp::backup() {
 	if (_is_xolotl_app) {
 		// Get the state from Xolotl
 		mooseAssert(_executioner, "Executioner is nullptr");
-		XolotlProblem &xolotl_problem =
-				(XolotlProblem&) _executioner->feProblem();
+		XolotlNetworkProblem &xolotl_problem =
+				(XolotlNetworkProblem&) _executioner->feProblem();
 		xolotl_problem.saveState();
 	}
 
@@ -70,8 +76,8 @@ void coupling_xolotlApp::restore(std::shared_ptr<Backup> backup,
 	if (_is_xolotl_app) {
 		// Set it in Xolotl
 		mooseAssert(_executioner, "Executioner is nullptr");
-		XolotlProblem &xolotl_problem =
-				(XolotlProblem&) _executioner->feProblem();
+		XolotlNetworkProblem &xolotl_problem =
+				(XolotlNetworkProblem&) _executioner->feProblem();
 		xolotl_problem.setState();
 	}
 }

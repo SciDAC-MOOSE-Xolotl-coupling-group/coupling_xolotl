@@ -35,23 +35,22 @@ InputParameters validParams<XolotlReflectedMesh>() {
 	// This mesh is always distributed
 	params.set < MooseEnum > ("parallel_type") = "DISTRIBUTED";
 
-	// Parameter for the Xolotl file name
-	params.addRequiredParam < FileName
-			> ("XolotlInput_path_name", "Name with the path for the Xolotl input file");
+	// Parameter for the Xolotl file names
+	params.addRequiredParam < std::vector<FileName>
+			> ("subnetwork_xolotl_filenames", "Name with the path for the Xolotl input files");
 
 	return params;
 }
 
 XolotlReflectedMesh::XolotlReflectedMesh(const InputParameters &parameters) :
-		MooseMesh(parameters), _xolotl_input_path_name(
-				getParam < FileName > ("XolotlInput_path_name")), _dim(
-				getParam < MooseEnum > ("dim"))
-{
+		MooseMesh(parameters), _subnetwork_xolotl_filenames(
+				getParam < std::vector<FileName>
+						> ("subnetwork_xolotl_filenames")), _dim(
+				getParam < MooseEnum > ("dim")) {
 	// Get the external app to create the interface and its grid
-	coupling_xolotlApp *xolotl_app =
-			dynamic_cast<coupling_xolotlApp*>(&_app);
+	coupling_xolotlApp *xolotl_app = dynamic_cast<coupling_xolotlApp*>(&_app);
 	// Create the interface to initialiaze the DMDA
-	xolotl_app->createInterface(_xolotl_input_path_name);
+	xolotl_app->createInterfaces(_subnetwork_xolotl_filenames);
 	// Now we can get the TS from the app
 	TS &ts = xolotl_app->getXolotlTS();
 	// Retrieve mesh from TS
@@ -125,6 +124,11 @@ void add_element_Edge2(DM da, const dof_id_type nx, const dof_id_type i,
 	// Get the geometry of the Xolotl grid information
 	double hy = 0.0, hz = 0.0;
 	auto xolotlGrid = interface.getGridInfo(hy, hz);
+
+	if (xolotlGrid.size() == 0) {
+		xolotlGrid.push_back(0.0);
+		xolotlGrid.push_back(1.0);
+	}
 
 	// Left
 	auto node0_ptr = mesh.add_point(libMesh::Point(xolotlGrid[i], 0, 0),
@@ -468,6 +472,11 @@ void add_node_Edge2(dof_id_type i, processor_id_type pid, MeshBase &mesh,
 	double hy = 0.0, hz = 0.0;
 	auto xolotlGrid = interface.getGridInfo(hy, hz);
 
+	if (xolotlGrid.size() == 0) {
+		xolotlGrid.push_back(0.0);
+		xolotlGrid.push_back(1.0);
+	}
+
 // Bottom Left Back
 	auto node0_ptr = mesh.add_point(libMesh::Point(xolotlGrid[i], 0.0, 0.0),
 			node_id_Edge2(i));
@@ -539,8 +548,11 @@ void build_cube_Edge2(UnstructuredMesh &mesh, DM da,
 // If there is no element at the given processor
 // We need to manually add all mesh nodes
 	if (xs == 0 && xm == 1)
-		for (PetscInt i = xs; i < xs + xm; i++)
-			add_node_Edge2(i, pid, mesh, interface);
+		for (PetscInt i = xs; i < xs + xm; i++) {
+			dof_id_type ele_id = (i - 1);
+			add_element_Edge2(da, Mx - 1, i - 1, ele_id, pid, mesh, interface);
+//			add_node_Edge2(i, pid, mesh, interface);
+		}
 
 // Need to link up the local elements before we can know what's missing
 	mesh.find_neighbors();
@@ -717,6 +729,109 @@ void build_cube_Hex8(UnstructuredMesh &mesh, DM da,
 	mesh.allow_find_neighbors(true);
 }
 
+void add_dummy_element(const dof_id_type nx, const dof_id_type i,
+		const dof_id_type elem_id, const processor_id_type pid,
+		MeshBase &mesh) {
+	BoundaryInfo &boundary_info = mesh.get_boundary_info();
+	// Mx: number of grid points in x direction for all processors
+	// xp: number of processors in x direction
+	PetscInt Mx = 4, xp = 1;
+
+	// Try to calculate processor-grid coordinate (xpid, ypid, zpid)
+	PetscInt xpid = 0, xpidplus = 0;
+
+	// Get the geometry of the Xolotl grid information
+	double hy = 0.0, hz = 0.0;
+	std::vector<double> xolotlGrid;
+	xolotlGrid.push_back(0.0);
+	xolotlGrid.push_back(1.0);
+	xolotlGrid.push_back(2.0);
+	xolotlGrid.push_back(3.0);
+
+	// Left
+	auto node0_ptr = mesh.add_point(libMesh::Point(xolotlGrid[i], 0, 0),
+			node_id_Edge2(i));
+	node0_ptr->set_unique_id(node_id_Edge2(i));
+	node0_ptr->set_id() = node0_ptr->unique_id();
+	// xpid + ypid * xp is the global processor ID
+	node0_ptr->processor_id() = xpid;
+
+	// Right
+	auto node1_ptr = mesh.add_point(libMesh::Point(xolotlGrid[i + 1], 0, 0),
+			node_id_Edge2(i + 1));
+	node1_ptr->set_unique_id(node_id_Edge2(i + 1));
+	node1_ptr->set_id() = node1_ptr->unique_id();
+	node1_ptr->processor_id() = xpidplus;
+
+	// New an element and attach two nodes to it
+	Elem *elem = new Edge2;
+	elem->set_id(elem_id);
+	elem->processor_id() = pid;
+	// Make sure our unique_id doesn't overlap any nodes'
+	elem->set_unique_id(elem_id + (nx + 1));
+	elem = mesh.add_elem(elem);
+	elem->set_node(0) = node0_ptr;
+	elem->set_node(1) = node1_ptr;
+
+	// Right
+	if (i == nx - 1)
+		boundary_info.add_side(elem, 0, 0);
+	// Left
+	if (i == 0)
+		boundary_info.add_side(elem, 1, 1);
+}
+
+void build_dummy_mesh(UnstructuredMesh &mesh) {
+	const auto pid = mesh.comm().rank();
+
+	BoundaryInfo &boundary_info = mesh.get_boundary_info();
+// xs: start grid point (not element) index on local in x direction
+// xm: number of grid points owned by the local processor in x direction
+// Mx: number of grid points on all processors in x direction
+// xp: number of processor cores in x direction
+	PetscInt xs = 0, xm = 4, Mx = 4, xp = 1;
+
+	for (PetscInt i = xs; i < xs + xm; i++) {
+		// We loop over grid points, but we are
+		// here building elements. So that we just
+		// simply skip the first x and y points since the
+		// number of grid ponts is one more than
+		// the number of grid elements
+		if (!i)
+			continue;
+
+		dof_id_type ele_id = (i - 1);
+
+		add_dummy_element(Mx - 1, i - 1, ele_id, pid, mesh);
+	}
+
+// Need to link up the local elements before we can know what's missing
+	mesh.find_neighbors();
+
+	mesh.find_neighbors(true);
+
+// Set RemoteElem neighbors
+	for (auto &elem_ptr : mesh.element_ptr_range())
+		for (unsigned int s = 0; s < elem_ptr->n_sides(); s++)
+			if (!elem_ptr->neighbor_ptr(s)
+					&& !boundary_info.n_boundary_ids(elem_ptr, s))
+				elem_ptr->set_neighbor(s, const_cast<RemoteElem*>(remote_elem));
+
+	set_boundary_names_Edge2(boundary_info);
+// Already partitioned!
+	mesh.skip_partitioning(true);
+
+	// We've already set our own unique_id values; now make sure that
+	// future mesh modifications use subsequent values.
+	mesh.set_next_unique_id(Mx + (Mx - 1));
+
+// No need to renumber or find neighbors - done did it.
+	mesh.allow_renumbering(false);
+	mesh.allow_find_neighbors(false);
+	mesh.prepare_for_use();
+	mesh.allow_find_neighbors(true);
+}
+
 void XolotlReflectedMesh::buildMesh() {
 // Reference to the libmesh mesh
 	MeshBase &mesh = getMesh();
@@ -726,25 +841,28 @@ void XolotlReflectedMesh::buildMesh() {
 
 // Get the app to get the interface for the geometry of the grid
 	coupling_xolotlApp *xolotl_app = dynamic_cast<coupling_xolotlApp*>(&_app);
-	auto interface = xolotl_app->getInterface();
+	auto interface = (xolotl_app->getInterfaces()).front();
 
-// Switching on MooseEnum
-	switch (_dim) {
-	case 1:
-		build_cube_Edge2(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
-				 *interface);
-		break;
-	case 2:
-		build_cube_Quad4(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
-				 *interface);
-		break;
-	case 3:
-		build_cube_Hex8(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
-				 *interface);
-		break;
-	default:
-		mooseError("Does not support dimension ", _dim, "yet");
-	}
+	// Build dummy mesh
+	build_dummy_mesh(dynamic_cast<UnstructuredMesh&>(getMesh()));
+
+//// Switching on MooseEnum
+//	switch (_dim) {
+//	case 1:
+//		build_cube_Edge2(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
+//				*interface);
+//		break;
+//	case 2:
+//		build_cube_Quad4(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
+//				*interface);
+//		break;
+//	case 3:
+//		build_cube_Hex8(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
+//				*interface);
+//		break;
+//	default:
+//		mooseError("Does not support dimension ", _dim, "yet");
+//	}
 
 	std::cout << "Done building" << std::endl;
 }

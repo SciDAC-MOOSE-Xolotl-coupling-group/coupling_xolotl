@@ -42,7 +42,7 @@ public:
 
 protected:
 	/// The path to the input file for Xolotl
-	FileName _xolotl_input_path_name;
+	std::vector<FileName> _subnetwork_xolotl_filenames;
 
 	/// The dimension of the mesh
 	MooseEnum _dim;
