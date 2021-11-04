@@ -1,0 +1,9 @@
+[Tests]
+  [./Xolotl_to_xolotl]
+    type = 'CheckFiles'
+    input = 'multi_xolotl.i'
+    check_files = 'FullAlphaZr.dat'
+    allow_unused = True
+    allow_warnings = True
+  [../]
+[]

@@ -22,13 +22,16 @@ InputParameters validParams<XolotlNetworkProblem>() {
 	// Parameter for the Xolotl file name
 	params.addRequiredParam < FileName
 			> ("network_xolotl_filename", "Name with the path for the Xolotl input file with the full network");
+	params.addRequiredParam < std::vector<FileName>
+			> ("subnetwork_xolotl_filenames", "Name with the path for the Xolotl input files");
 	return params;
 }
 
 XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 		ExternalProblem(params), _network_xolotl_filename(
-				getParam < FileName > ("network_xolotl_filename")), _subInterfaces(
-				static_cast<coupling_xolotlApp&>(_app).getInterfaces()), _current_time(
+				getParam < FileName > ("network_xolotl_filename")), _subnetwork_xolotl_filenames(
+						getParam < std::vector<FileName>
+								> ("subnetwork_xolotl_filenames")), _current_time(
 				declareRestartableData < Real > ("current_time", 0.0)), _current_dt(
 				declareRestartableData < Real > ("current_dt", 0.0)), _previous_time(
 				declareRestartableData < Real > ("previous_time", 0.0)), _conc_vector(
@@ -52,9 +55,17 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 	_networkInterface->initializeXolotl(argc, argv,
 			(_app.getCommunicator())->get());
 
-	xolotl::IdType xs, ys, zs, xm, ym, zm, Mx, My, Mz;
-	(_subInterfaces.front())->getLocalCoordinates(xs, xm, Mx, ys, ym, My, zs,
-			zm, Mz);
+	_subInterfaces.clear();
+	// Loop on the number of parameter files
+	for (auto name : _subnetwork_xolotl_filenames) {
+		_subInterfaces.push_back(std::make_shared<XolotlInterface>());
+
+		std::string fakeAppName = "subXolotl";
+		argv[0] = fakeAppName.c_str();
+		argv[1] = name.c_str();
+
+		(_subInterfaces.back())->initializeXolotl(argc, argv, (_app.getCommunicator())->get());
+	}
 
 	// Exchange information about the sub networks
 	std::vector < std::vector<std::vector<std::uint32_t>> > allBounds;
@@ -66,11 +77,16 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 		// Add them to the main vector
 		allBounds.push_back(bounds);
 		_subDOFs.push_back(bounds.size());
-		std::cout << bounds.size() << std::endl;
 	}
 
 	// Pass it the the network instance
 	_networkInterface->initializeClusterMaps(allBounds);
+
+	// Take care of the fluxes
+	auto fluxVector = _networkInterface->getImplantedFlux();
+	for (auto i = 0; i < _subInterfaces.size(); i++) {
+		_subInterfaces[i]->setImplantedFlux(fluxVector[i]);
+	}
 }
 
 void XolotlNetworkProblem::externalSolve() {
@@ -82,10 +98,14 @@ void XolotlNetworkProblem::externalSolve() {
 			auto sparseConc = _subInterfaces[i]->getConcVector();
 			std::vector<double> subConc(_subDOFs[i], 0.0);
 			for (auto pair : sparseConc[0][0][0]) {
-				subConc[pair.first] = pair.second;
+				if (pair.first < _subDOFs[i])
+					subConc[pair.first] = pair.second;
 			}
 			conc.push_back(subConc);
 		}
+
+		// Print the result
+		_networkInterface->outputData(_current_time, conc);
 
 		// Compute the new rates
 		auto constantRates = _networkInterface->computeConstantRates(conc);

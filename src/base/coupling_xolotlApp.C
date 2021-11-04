@@ -10,37 +10,17 @@ InputParameters coupling_xolotlApp::validParams() {
 	InputParameters params = MooseApp::validParams();
 
 	// By default, use preset BCs
-	params.set<bool>("use_legacy_dirichlet_bc") = false;
 	params.set<bool>("use_legacy_material_output") = false;
 
 	return params;
 }
 
 coupling_xolotlApp::coupling_xolotlApp(InputParameters parameters) :
-		MooseApp(parameters), _is_xolotl_app(
-				false) {
+		MooseApp(parameters) {
 	coupling_xolotlApp::registerAll(_factory, _action_factory, _syntax);
 }
 
 coupling_xolotlApp::~coupling_xolotlApp() {
-}
-
-void coupling_xolotlApp::createInterfaces(std::vector<FileName> paramNames) {
-	_interfaces.clear();
-	// Loop on the number of parameter files
-	for (auto name : paramNames) {
-		_interfaces.push_back(std::make_shared<XolotlInterface>());
-
-		int argc = 2;
-		const char *argv[argc + 1];
-		std::string fakeAppName = "subXolotl";
-		argv[0] = fakeAppName.c_str();
-		argv[1] = name.c_str();
-
-		(_interfaces.back())->initializeXolotl(argc, argv, _comm->get());
-	}
-
-	_is_xolotl_app = true;
 }
 
 void coupling_xolotlApp::registerAll(Factory &f, ActionFactory &af, Syntax &s) {
@@ -56,13 +36,11 @@ void coupling_xolotlApp::registerApps() {
 }
 
 std::shared_ptr<Backup> coupling_xolotlApp::backup() {
-	if (_is_xolotl_app) {
-		// Get the state from Xolotl
-		mooseAssert(_executioner, "Executioner is nullptr");
-		XolotlNetworkProblem &xolotl_problem =
-				(XolotlNetworkProblem&) _executioner->feProblem();
-		xolotl_problem.saveState();
-	}
+	// Get the state from Xolotl
+	mooseAssert(_executioner, "Executioner is nullptr");
+	XolotlNetworkProblem &xolotl_problem =
+			(XolotlNetworkProblem&) _executioner->feProblem();
+	xolotl_problem.saveState();
 
 	// Back it up
 	return MooseApp::backup();
@@ -73,13 +51,11 @@ void coupling_xolotlApp::restore(std::shared_ptr<Backup> backup,
 	// Restore the state
 	MooseApp::restore(backup, for_restart);
 
-	if (_is_xolotl_app) {
-		// Set it in Xolotl
-		mooseAssert(_executioner, "Executioner is nullptr");
-		XolotlNetworkProblem &xolotl_problem =
-				(XolotlNetworkProblem&) _executioner->feProblem();
-		xolotl_problem.setState();
-	}
+	// Set it in Xolotl
+	mooseAssert(_executioner, "Executioner is nullptr");
+	XolotlNetworkProblem &xolotl_problem =
+			(XolotlNetworkProblem&) _executioner->feProblem();
+	xolotl_problem.setState();
 }
 
 /***************************************************************************************************
