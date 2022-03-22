@@ -30,8 +30,8 @@ InputParameters validParams<XolotlNetworkProblem>() {
 XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 		ExternalProblem(params), _network_xolotl_filename(
 				getParam < FileName > ("network_xolotl_filename")), _subnetwork_xolotl_filenames(
-						getParam < std::vector<FileName>
-								> ("subnetwork_xolotl_filenames")), _current_time(
+				getParam < std::vector<FileName>
+						> ("subnetwork_xolotl_filenames")), _current_time(
 				declareRestartableData < Real > ("current_time", 0.0)), _current_dt(
 				declareRestartableData < Real > ("current_dt", 0.0)), _previous_time(
 				declareRestartableData < Real > ("previous_time", 0.0)), _conc_vector(
@@ -64,11 +64,13 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 		argv[0] = fakeAppName.c_str();
 		argv[1] = name.c_str();
 
-		(_subInterfaces.back())->initializeXolotl(argc, argv, (_app.getCommunicator())->get());
+		(_subInterfaces.back())->initializeXolotl(argc, argv,
+				(_app.getCommunicator())->get());
 	}
 
 	// Exchange information about the sub networks
-	std::vector < std::vector<std::vector<std::uint32_t>> > allBounds;
+	std::vector < std::vector<std::vector<std::uint32_t> > > allBounds;
+	std::vector < std::vector < std::vector<xolotl::IdType> > > allMomIdInfo;
 	// Loop on the sub interfaces
 	for (auto inter : _subInterfaces) {
 		// Get the bounds
@@ -77,10 +79,14 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 		// Add them to the main vector
 		allBounds.push_back(bounds);
 		_subDOFs.push_back(bounds.size());
+
+		// Get the mom Id info
+		auto momIdInfo = inter->getAllMomentIdInfo();
+		allMomIdInfo.push_back(momIdInfo);
 	}
 
 	// Pass it the the network instance
-	_networkInterface->initializeClusterMaps(allBounds);
+	_networkInterface->initializeClusterMaps(allBounds, allMomIdInfo);
 
 	// Take care of the fluxes
 	auto fluxVector = _networkInterface->getImplantedFlux();
@@ -92,34 +98,46 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 void XolotlNetworkProblem::externalSolve() {
 	// Check that the next time is larger than the current one
 	if (time() > _current_time) {
-		std::vector < std::vector<double> > conc;
-		// Loop on the sub interfaces to get all the concentrations
-		for (auto i = 0; i < _subInterfaces.size(); i++) {
-			auto sparseConc = _subInterfaces[i]->getConcVector();
-			std::vector<double> subConc(_subDOFs[i], 0.0);
-			for (auto pair : sparseConc[0][0][0]) {
-				if (pair.first < _subDOFs[i])
-					subConc[pair.first] = pair.second;
+		double finalTime = 0.0, deltaTime = 0.0;
+		if (dt() > 1.0) {
+			deltaTime = 1.0;
+			finalTime = _current_time + deltaTime;
+		} else {
+			deltaTime = dt();
+			finalTime = time();
+		}
+
+		while (_current_time < time()) {
+			std::vector < std::vector<double> > conc;
+			// Loop on the sub interfaces to get all the concentrations
+			for (auto i = 0; i < _subInterfaces.size(); i++) {
+				auto sparseConc = _subInterfaces[i]->getConcVector();
+				std::vector<double> subConc(_subDOFs[i], 0.0);
+				for (auto pair : sparseConc[0][0][0]) {
+					if (pair.first < _subDOFs[i])
+						subConc[pair.first] = pair.second;
+				}
+				conc.push_back(subConc);
 			}
-			conc.push_back(subConc);
+
+			// Print the result
+			_networkInterface->outputData(_current_time, conc);
+
+			// Compute the new rates
+			auto constantRates = _networkInterface->computeConstantRates(conc);
+
+			// Pass them
+			for (auto i = 0; i < _subInterfaces.size(); i++) {
+				_subInterfaces[i]->setConstantRates(constantRates[i]);
+				// Set the time we want to reach
+				_subInterfaces[i]->setTimes(finalTime, deltaTime);
+				// Run the solver
+				_subInterfaces[i]->solveXolotl();
+			}
+			// Save the current time
+			_current_time += deltaTime;
+			finalTime += deltaTime;
 		}
-
-		// Print the result
-		_networkInterface->outputData(_current_time, conc);
-
-		// Compute the new rates
-		auto constantRates = _networkInterface->computeConstantRates(conc);
-
-		// Pass them
-		for (auto i = 0; i < _subInterfaces.size(); i++) {
-			_subInterfaces[i]->setConstantRates(constantRates[i]);
-			// Set the time we want to reach
-			_subInterfaces[i]->setTimes(time(), dt());
-			// Run the solver
-			_subInterfaces[i]->solveXolotl();
-		}
-		// Save the current time
-		_current_time = time();
 	}
 }
 
