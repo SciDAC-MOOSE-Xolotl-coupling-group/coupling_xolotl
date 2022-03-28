@@ -59,6 +59,7 @@ private:
 	std::vector<std::shared_ptr<XolotlInterface> > _subInterfaces;
 	std::vector<xolotl::IdType> _subDOFs;
 	Real &_current_time;
+	Real _max_dt;
 
 	// Variables for restart
 	Real &_current_dt;

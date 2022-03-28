@@ -24,6 +24,7 @@ InputParameters validParams<XolotlNetworkProblem>() {
 			> ("network_xolotl_filename", "Name with the path for the Xolotl input file with the full network");
 	params.addRequiredParam < std::vector<FileName>
 			> ("subnetwork_xolotl_filenames", "Name with the path for the Xolotl input files");
+	params.addParam < Real > ("max_dt", 1.0e9, "The maximum coupling dt (s)");
 	return params;
 }
 
@@ -32,7 +33,8 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 				getParam < FileName > ("network_xolotl_filename")), _subnetwork_xolotl_filenames(
 				getParam < std::vector<FileName>
 						> ("subnetwork_xolotl_filenames")), _current_time(
-				declareRestartableData < Real > ("current_time", 0.0)), _current_dt(
+				declareRestartableData < Real > ("current_time", 0.0)), _max_dt(
+				getParam < Real > ("max_dt")), _current_dt(
 				declareRestartableData < Real > ("current_dt", 0.0)), _previous_time(
 				declareRestartableData < Real > ("previous_time", 0.0)), _conc_vector(
 				declareRestartableData
@@ -70,7 +72,7 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 
 	// Exchange information about the sub networks
 	std::vector < std::vector<std::vector<std::uint32_t> > > allBounds;
-	std::vector < std::vector < std::vector<xolotl::IdType> > > allMomIdInfo;
+	std::vector < std::vector<std::vector<xolotl::IdType> > > allMomIdInfo;
 	// Loop on the sub interfaces
 	for (auto inter : _subInterfaces) {
 		// Get the bounds
@@ -99,8 +101,8 @@ void XolotlNetworkProblem::externalSolve() {
 	// Check that the next time is larger than the current one
 	if (time() > _current_time) {
 		double finalTime = 0.0, deltaTime = 0.0;
-		if (dt() > 1.0) {
-			deltaTime = 1.0;
+		if (dt() > _max_dt) {
+			deltaTime = _max_dt;
 			finalTime = _current_time + deltaTime;
 		} else {
 			deltaTime = dt();
