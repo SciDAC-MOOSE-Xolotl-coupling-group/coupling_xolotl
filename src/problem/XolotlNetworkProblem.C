@@ -58,7 +58,10 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 			(_app.getCommunicator())->get());
 
 	_subInterfaces.clear();
+
 	// Loop on the number of parameter files
+	std::vector < std::vector<std::vector<std::uint32_t> > > allBounds;
+	std::vector < std::vector<std::vector<xolotl::IdType> > > allMomIdInfo;
 	for (auto name : _subnetwork_xolotl_filenames) {
 		_subInterfaces.push_back(std::make_shared<XolotlInterface>());
 
@@ -68,27 +71,33 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 
 		(_subInterfaces.back())->initializeXolotl(argc, argv,
 				(_app.getCommunicator())->get());
-	}
 
-	// Exchange information about the sub networks
-	std::vector < std::vector<std::vector<std::uint32_t> > > allBounds;
-	std::vector < std::vector<std::vector<xolotl::IdType> > > allMomIdInfo;
-	// Loop on the sub interfaces
-	for (auto inter : _subInterfaces) {
 		// Get the bounds
-		auto bounds = inter->getAllClusterBounds();
+		auto bounds = _subInterfaces.back()->getAllClusterBounds();
 
 		// Add them to the main vector
 		allBounds.push_back(bounds);
 		_subDOFs.push_back(bounds.size());
 
 		// Get the mom Id info
-		auto momIdInfo = inter->getAllMomentIdInfo();
+		auto momIdInfo = _subInterfaces.back()->getAllMomentIdInfo();
 		allMomIdInfo.push_back(momIdInfo);
 	}
 
 	// Pass it the the network instance
 	_networkInterface->initializeClusterMaps(allBounds, allMomIdInfo);
+
+	// Take care of the sub network reactions
+	auto connectivities = _networkInterface->getConstantConnectivities();
+	// Loop on the sub interfaces
+	xolotl::IdType count = 0;
+	for (auto inter : _subInterfaces) {
+		inter->setConstantConnectivities(connectivities[count]);
+		inter->initializeReactions();
+		inter->initializeSolver();
+
+		count++;
+	}
 
 	// Take care of the fluxes
 	auto fluxVector = _networkInterface->getImplantedFlux();
