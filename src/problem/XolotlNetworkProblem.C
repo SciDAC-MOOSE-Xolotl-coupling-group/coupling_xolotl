@@ -34,7 +34,8 @@ XolotlNetworkProblem::XolotlNetworkProblem(const InputParameters &params) :
 				getParam < std::vector<FileName>
 						> ("subnetwork_xolotl_filenames")), _current_time(
 				declareRestartableData < Real > ("current_time", 0.0)), _max_dt(
-				getParam < Real > ("max_dt")), _current_dt(
+				getParam < Real > ("max_dt")), _localXM(
+				declareRestartableData < xolotl::IdType > ("localXM", 1)), _current_dt(
 				declareRestartableData < Real > ("current_dt", 0.0)), _previous_time(
 				declareRestartableData < Real > ("previous_time", 0.0)), _conc_vector(
 				declareRestartableData
@@ -119,27 +120,46 @@ void XolotlNetworkProblem::externalSolve() {
 		}
 
 		while (_current_time < time()) {
-			std::vector < std::vector<double> > conc;
-			// Loop on the sub interfaces to get all the concentrations
-			for (auto i = 0; i < _subInterfaces.size(); i++) {
-				auto sparseConc = _subInterfaces[i]->getConcVector();
-				std::vector<double> subConc(_subDOFs[i], 0.0);
-				for (auto pair : sparseConc[0][0][0]) {
-					if (pair.first < _subDOFs[i])
-						subConc[pair.first] = pair.second;
+			// Transfer the temperature to the full network
+			std::vector<double> temperatures;
+			std::vector<double> depths;
+			_subInterfaces[0]->getNetworkTemperature(temperatures, depths);
+			_networkInterface->setNetworkTemperature(temperatures, depths);
+
+			// Loop on the grid points
+			std::vector < std::vector<std::vector<double> > > fullConc;
+			for (auto j = 0; j < temperatures.size() - 2; j++) {
+				std::vector < std::vector<double> > conc;
+				// Loop on the sub interfaces to get all the concentrations
+				for (auto i = 0; i < _subInterfaces.size(); i++) {
+					auto sparseConc = _subInterfaces[i]->getConcVector();
+					std::vector<double> subConc(_subDOFs[i], 0.0);
+					for (auto pair : sparseConc[0][0][j]) {
+						if (pair.first < _subDOFs[i]) {
+							subConc[pair.first] = pair.second;
+						}
+					}
+					conc.push_back(subConc);
 				}
-				conc.push_back(subConc);
+
+				fullConc.push_back(conc);
+
+				// Compute the new rates
+				auto constantRates = _networkInterface->computeConstantRates(
+						conc, j);
+
+				// Pass them
+				for (auto i = 0; i < _subInterfaces.size(); i++) {
+					_subInterfaces[i]->setConstantRates(constantRates[i], j+1);
+				}
 			}
 
 			// Print the result
-			_networkInterface->outputData(_current_time, conc);
+			_networkInterface->outputData(_current_time, fullConc,
+					temperatures.size() - 2);
 
-			// Compute the new rates
-			auto constantRates = _networkInterface->computeConstantRates(conc);
-
-			// Pass them
+			// Solve
 			for (auto i = 0; i < _subInterfaces.size(); i++) {
-				_subInterfaces[i]->setConstantRates(constantRates[i]);
 				// Set the time we want to reach
 				_subInterfaces[i]->setTimes(finalTime, deltaTime);
 				// Run the solver
