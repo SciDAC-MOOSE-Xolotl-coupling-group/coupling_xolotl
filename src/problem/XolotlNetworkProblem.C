@@ -124,7 +124,6 @@ void XolotlNetworkProblem::externalSolve() {
 			std::vector<double> temperatures;
 			std::vector<double> depths;
 			_subInterfaces[0]->getNetworkTemperature(temperatures, depths);
-			_networkInterface->setNetworkTemperature(temperatures, depths);
 
 			// Loop on the grid points
 			std::vector < std::vector<std::vector<double> > > fullConc;
@@ -145,12 +144,16 @@ void XolotlNetworkProblem::externalSolve() {
 				fullConc.push_back(conc);
 
 				// Compute the new rates
+				std::vector<double> temperature = { temperatures[j + 1] };
+				std::vector<double> depth = { depths[j + 1] };
+				_networkInterface->setNetworkTemperature(temperature, depth);
 				auto constantRates = _networkInterface->computeConstantRates(
-						conc, j);
+						conc, 0);
 
 				// Pass them
 				for (auto i = 0; i < _subInterfaces.size(); i++) {
-					_subInterfaces[i]->setConstantRates(constantRates[i], j+1);
+					_subInterfaces[i]->setConstantRates(constantRates[i],
+							j + 1);
 				}
 			}
 
