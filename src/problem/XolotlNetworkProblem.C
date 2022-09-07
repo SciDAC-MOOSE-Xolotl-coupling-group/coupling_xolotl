@@ -124,16 +124,16 @@ void XolotlNetworkProblem::externalSolve() {
 			std::vector<double> temperatures;
 			std::vector<double> depths;
 			_subInterfaces[0]->getNetworkTemperature(temperatures, depths);
-
-			// Loop on the grid points
 			std::vector < std::vector<std::vector<double> > > fullConc;
-			for (auto j = 0; j < temperatures.size() - 2; j++) {
+
+			// 0D
+			if (temperatures.size() < 2) {
 				std::vector < std::vector<double> > conc;
 				// Loop on the sub interfaces to get all the concentrations
 				for (auto i = 0; i < _subInterfaces.size(); i++) {
 					auto sparseConc = _subInterfaces[i]->getConcVector();
 					std::vector<double> subConc(_subDOFs[i], 0.0);
-					for (auto pair : sparseConc[0][0][j]) {
+					for (auto pair : sparseConc[0][0][0]) {
 						if (pair.first < _subDOFs[i]) {
 							subConc[pair.first] = pair.second;
 						}
@@ -144,22 +144,55 @@ void XolotlNetworkProblem::externalSolve() {
 				fullConc.push_back(conc);
 
 				// Compute the new rates
-				std::vector<double> temperature = { temperatures[j + 1] };
-				std::vector<double> depth = { depths[j + 1] };
+				std::vector<double> temperature = { temperatures[0] };
+				std::vector<double> depth = { depths[0] };
 				_networkInterface->setNetworkTemperature(temperature, depth);
 				auto constantRates = _networkInterface->computeConstantRates(
 						conc, 0);
 
 				// Pass them
 				for (auto i = 0; i < _subInterfaces.size(); i++) {
-					_subInterfaces[i]->setConstantRates(constantRates[i],
-							j + 1);
+					_subInterfaces[i]->setConstantRates(constantRates[i], 0);
+				}
+			}
+			// 1D
+			else {
+				// Loop on the grid points
+				for (auto j = 0; j < temperatures.size() - 2; j++) {
+					std::vector < std::vector<double> > conc;
+					// Loop on the sub interfaces to get all the concentrations
+					for (auto i = 0; i < _subInterfaces.size(); i++) {
+						auto sparseConc = _subInterfaces[i]->getConcVector();
+						std::vector<double> subConc(_subDOFs[i], 0.0);
+						for (auto pair : sparseConc[0][0][j]) {
+							if (pair.first < _subDOFs[i]) {
+								subConc[pair.first] = pair.second;
+							}
+						}
+						conc.push_back(subConc);
+					}
+
+					fullConc.push_back(conc);
+
+					// Compute the new rates
+					std::vector<double> temperature = { temperatures[j + 1] };
+					std::vector<double> depth = { depths[j + 1] };
+					_networkInterface->setNetworkTemperature(temperature,
+							depth);
+					auto constantRates =
+							_networkInterface->computeConstantRates(conc, 0);
+
+					// Pass them
+					for (auto i = 0; i < _subInterfaces.size(); i++) {
+						_subInterfaces[i]->setConstantRates(constantRates[i],
+								j + 1);
+					}
 				}
 			}
 
 			// Print the result
 			_networkInterface->outputData(_current_time, fullConc,
-					temperatures.size() - 2);
+					std::max((int)temperatures.size() - 2, 1));
 
 			// Solve
 			for (auto i = 0; i < _subInterfaces.size(); i++) {

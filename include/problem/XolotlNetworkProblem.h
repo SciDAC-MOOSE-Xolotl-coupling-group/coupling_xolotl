@@ -24,13 +24,15 @@ InputParameters validParams<XolotlNetworkProblem>();
 class XolotlNetworkProblem: public ExternalProblem {
 public:
 	XolotlNetworkProblem(const InputParameters &params);
+
 	~XolotlNetworkProblem() {
 		std::vector<double> temperatures;
 		std::vector<double> depths;
 		_subInterfaces[0]->getNetworkTemperature(temperatures, depths);
 		// Loop on the grid points
 		std::vector < std::vector<std::vector<double> > > fullConc;
-		for (auto j = 0; j < temperatures.size() - 2; j++) {
+		// 0D
+		if (temperatures.size() < 2) {
 			std::vector < std::vector<double> > conc;
 			// Loop on the sub interfaces to get all the concentrations
 			for (auto i = 0; i < _subInterfaces.size(); i++) {
@@ -44,10 +46,32 @@ public:
 			}
 			fullConc.push_back(conc);
 		}
+		// 1D
+		else {
+			for (auto j = 0; j < temperatures.size() - 2; j++) {
+				// Loop on the grid points
+				for (auto j = 0; j < temperatures.size() - 2; j++) {
+					std::vector < std::vector<double> > conc;
+					// Loop on the sub interfaces to get all the concentrations
+					for (auto i = 0; i < _subInterfaces.size(); i++) {
+						auto sparseConc = _subInterfaces[i]->getConcVector();
+						std::vector<double> subConc(_subDOFs[i], 0.0);
+						for (auto pair : sparseConc[0][0][j]) {
+							if (pair.first < _subDOFs[i]) {
+								subConc[pair.first] = pair.second;
+							}
+						}
+						conc.push_back(subConc);
+					}
+
+					fullConc.push_back(conc);
+				}
+			}
+		}
 
 		// Print the result
 		_networkInterface->outputData(_current_time, fullConc,
-				temperatures.size() - 2);
+				std::max((int) temperatures.size() - 2, 1));
 	}
 
 	virtual void externalSolve() override;
@@ -79,6 +103,7 @@ private:
 			std::vector<
 					std::vector<std::vector<std::pair<xolotl::IdType, Real> > > > > &_conc_vector;
 
-};
+}
+;
 
 #endif /* XOLOTLNETWORKPROBLEM_H */
