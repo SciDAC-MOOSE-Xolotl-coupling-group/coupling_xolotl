@@ -15,14 +15,13 @@
 
 class XolotlNetworkProblem;
 
-template<>
-InputParameters validParams<XolotlNetworkProblem>();
-
 /**
  * This is an interface to call an external solver
  */
 class XolotlNetworkProblem: public ExternalProblem {
 public:
+	static InputParameters validParams();
+
 	XolotlNetworkProblem(const InputParameters &params);
 
 	~XolotlNetworkProblem() {

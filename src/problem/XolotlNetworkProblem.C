@@ -15,9 +15,8 @@ using std::max;
 
 registerMooseObject("coupling_xolotlApp", XolotlNetworkProblem);
 
-template<>
-InputParameters validParams<XolotlNetworkProblem>() {
-	InputParameters params = validParams<ExternalProblem>();
+InputParameters XolotlNetworkProblem::validParams() {
+	InputParameters params = ExternalProblem::validParams();
 
 	// Parameter for the Xolotl file name
 	params.addRequiredParam < FileName
@@ -198,8 +197,10 @@ void XolotlNetworkProblem::externalSolve() {
 			for (auto i = 0; i < _subInterfaces.size(); i++) {
 				// Set the time we want to reach
 				_subInterfaces[i]->setTimes(finalTime, deltaTime);
+
 				// Run the solver
 				_subInterfaces[i]->solveXolotl();
+
 			}
 			// Save the current time
 			_current_time += deltaTime;
