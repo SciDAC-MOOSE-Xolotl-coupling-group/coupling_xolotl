@@ -17,9 +17,6 @@ endif
 PETSC_DIR          ?=$(MOOSE_DIR)/petsc
 PETSC_ARCH         ?=arch-moose
 
-# Kokkos
-KOKKOS_DIR         ?= $(CURDIR)/kokkos
-
 # Xolotl
 XOLOTL_DIR         ?= $(CURDIR)/xolotl
 
@@ -86,17 +83,10 @@ $(ADDITIONAL_SRC_DEPS): $(XOLOTL_DEPEND_LIBS)
 # Then if source codes change, make will try to call "cmake"
 # "cmake" should build lib with updated source codes
 $(XOLOTL_DEPEND_LIBS): $(XOLOTL_DIR)/xolotl/solver/src/Solver.cpp
-	cd kokkos; \
+	cd xolotl; \
 	mkdir build; \
 	cd build; \
-	cmake -DCMAKE_INSTALL_PREFIX=$(KOKKOS_DIR)/install -DKokkos_ENABLE_SERIAL=ON \
-	-DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=ON -DKokkos_ENABLE_TESTS=OFF -DCMAKE_CXX_STANDARD=17 .. ; \
-	make install; \
-	cd ../../xolotl; \
-	mkdir build; \
-	cd build; \
-	cmake -DCMAKE_BUILD_TYPE=Release -DKokkos_DIR=$(KOKKOS_DIR)/install -DPETSC_DIR=$(PETSC_DIR) \
-	-DPETSC_ARCH=$(PETSC_ARCH) -DCMAKE_CXX_COMPILER=mpicxx \
+	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(PETSC_DIR)/$(PETSC_ARCH) \
 	-DBUILD_SHARED_LIBS=yes -DCMAKE_CXX_FLAGS_RELEASE="-O3 -fPIC" -DBUILD_TESTING=OFF \
 	-DCMAKE_INSTALL_PREFIX=$(XOLOTL_DIR)/install ..; \
 	make; make install \

@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "MooseApp.h"
-#include <xolotl/interface/Interface.h>
+#include <xolotl/interface/XolotlInterface.h>
 
 using XolotlInterface = xolotl::interface::XolotlInterface;
 
