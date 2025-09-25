@@ -20,17 +20,8 @@ XOLOTL_DIR         ?= $(CURDIR)/xolotl
 # framework
 FRAMEWORK_DIR      := $(MOOSE_DIR)/framework
 
-ADDITIONAL_SRC_DEPS := $(XOLOTL_DIR)/install/include/interface.h
-
 include $(FRAMEWORK_DIR)/build.mk
 include $(FRAMEWORK_DIR)/moose.mk
-
-# Darwin
-ifneq (,$(findstring darwin,$(libmesh_HOST)))
-	lib_suffix := dylib
-else
-	lib_suffix := so
-endif
 
 ################################## MODULES ####################################
 # To use certain physics included with MOOSE, set variables below to
@@ -56,10 +47,9 @@ POROUS_FLOW         := no
 
 include $(MOOSE_DIR)/modules/modules.mk
 
-# List XOLOTL as a dependency
-# Use ADDITIONAL flags to link XOLOTL
-XOLOTL_DEPEND_LIBS     := $(XOLOTL_DIR)/install/lib/libxolotlInterface.$(lib_suffix)
-# -Wl,-rpath trikcy is used for load XOLOTL properly from executable
+# List Xolotl as a dependency
+# Use ADDITIONAL flags to link Xolotl
+# -Wl,-rpath is used to load Xolotl properly from the executable
 ADDITIONAL_LIBS        += -L$(XOLOTL_DIR)/install/lib -Wl,-rpath,$(XOLOTL_DIR)/install/lib -lxolotlInterface
 ADDITIONAL_INCLUDES    += -I$(XOLOTL_DIR)/install/include
 
