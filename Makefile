@@ -57,6 +57,9 @@ ADDITIONAL_INCLUDES    += -I$(XOLOTL_DIR)/install/include
 APPLICATION_DIR    := $(CURDIR)
 APPLICATION_NAME   := coupling_xolotl
 BUILD_EXEC         := yes
-GEN_REVISION       := no
-# DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
+GEN_REVISION       := yes
+DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
 include            $(FRAMEWORK_DIR)/app.mk
+
+###############################################################################
+# Additional special case targets should be added here
