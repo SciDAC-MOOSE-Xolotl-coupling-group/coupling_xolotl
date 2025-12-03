@@ -41,9 +41,6 @@ protected:
 	/// The path to the input file for Xolotl
 	FileName _xolotl_input_path_name;
 
-	/// The dimension of the mesh
-	MooseEnum _dim;
-
 	/// Number of elements in x, y, z direction
 	dof_id_type _nx, _ny, _nz;
 

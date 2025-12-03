@@ -38,14 +38,22 @@ InputParameters XolotlReflectedMesh::validParams() {
 	// Parameter for the Xolotl file name
 	params.addRequiredParam < FileName
 			> ("XolotlInput_path_name", "Name with the path for the Xolotl input file");
+	
+	// Mesh dimension
+	MooseEnum dims("1=1 2 3", "1");
+  	params.addParam<MooseEnum>("dim",
+                             dims,
+                             "This is only required for certain mesh formats where "
+                             "the dimension of the mesh cannot be autodetected. "
+                             "In particular you must supply this for GMSH meshes. "
+                             "Note: This is completely ignored for ExodusII meshes!");
 
 	return params;
 }
 
 XolotlReflectedMesh::XolotlReflectedMesh(const InputParameters &parameters) :
 		MooseMesh(parameters), _xolotl_input_path_name(
-				getParam < FileName > ("XolotlInput_path_name")), _dim(
-				getParam < MooseEnum > ("dim")) {
+				getParam < FileName > ("XolotlInput_path_name")) {
 	// Get the external app to create the interface and its grid
 	coupling_xolotlApp *xolotl_app = dynamic_cast<coupling_xolotlApp*>(&_app);
 	// Create the interface to initialiaze the DMDA
@@ -719,15 +727,16 @@ void XolotlReflectedMesh::buildMesh() {
 // Reference to the libmesh mesh
 	MeshBase &mesh = getMesh();
 
-	mesh.set_mesh_dimension(_dim);
-	mesh.set_spatial_dimension(_dim);
+	auto dim = getParam<MooseEnum>("dim");
+	mesh.set_mesh_dimension(dim);
+	mesh.set_spatial_dimension(dim);
 
 // Get the app to get the interface for the geometry of the grid
 	coupling_xolotlApp *xolotl_app = dynamic_cast<coupling_xolotlApp*>(&_app);
 	auto interface = xolotl_app->getInterface();
 
 // Switching on MooseEnum
-	switch (_dim) {
+	switch (dim) {
 	case 1:
 		build_cube_Edge2(dynamic_cast<UnstructuredMesh&>(getMesh()), _dmda,
 				*interface);
@@ -741,7 +750,7 @@ void XolotlReflectedMesh::buildMesh() {
 				*interface);
 		break;
 	default:
-		mooseError("Does not support dimension ", _dim, "yet");
+		mooseError("Does not support dimension ", dim, "yet");
 	}
 
 	std::cout << "Done building" << std::endl;

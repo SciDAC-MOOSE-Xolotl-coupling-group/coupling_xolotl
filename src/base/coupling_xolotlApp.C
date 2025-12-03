@@ -5,6 +5,7 @@
 #include "XolotlProblem.h"
 #include "Executioner.h"
 #include "ModulesApp.h"
+#include <Kokkos_Core.hpp>
 
 InputParameters coupling_xolotlApp::validParams() {
 	InputParameters params = MooseApp::validParams();
@@ -19,6 +20,7 @@ coupling_xolotlApp::coupling_xolotlApp(InputParameters parameters) :
 		MooseApp(parameters), _interface(std::make_shared<XolotlInterface>()), _is_xolotl_app(
 				false) {
 	coupling_xolotlApp::registerAll(_factory, _action_factory, _syntax);
+	if (!Kokkos::is_initialized()) Kokkos::initialize();
 }
 
 coupling_xolotlApp::~coupling_xolotlApp() {

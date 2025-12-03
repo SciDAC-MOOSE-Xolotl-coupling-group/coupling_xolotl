@@ -4,7 +4,7 @@
 [Mesh]
   type = XolotlReflectedMesh
   dim = 2
-  XolotlInput_path_name = './param_2D_noCnoR_freeSurface.txt'
+  XolotlInput_path_name = './param_2D_noCnoR_freeSurface.json'
 []
 
 [AuxVariables]
