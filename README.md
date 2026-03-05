@@ -10,7 +10,7 @@ First setup a conda environment following the steps from [here](https://moosefra
 ```bash
 conda create -n coupling_xolotl
 conda activate coupling_xolotl
-conda install moose-mpi moose-tools boost=1.84.0
+conda install moose-mpi moose-tools moose-wasp mpich
 ```
 
 Then get the code:

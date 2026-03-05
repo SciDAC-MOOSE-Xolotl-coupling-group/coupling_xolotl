@@ -38,7 +38,7 @@ InputParameters XolotlReflectedMesh::validParams() {
 	// Parameter for the Xolotl file name
 	params.addRequiredParam < FileName
 			> ("XolotlInput_path_name", "Name with the path for the Xolotl input file");
-	
+
 	// Mesh dimension
 	MooseEnum dims("1=1 2 3", "1");
   	params.addParam<MooseEnum>("dim",
@@ -65,7 +65,7 @@ XolotlReflectedMesh::XolotlReflectedMesh(const InputParameters &parameters) :
 }
 
 std::unique_ptr<MooseMesh> XolotlReflectedMesh::safeClone() const {
-	return libmesh_make_unique < XolotlReflectedMesh > (*this);
+	return std::make_unique < XolotlReflectedMesh > (*this);
 }
 
 inline dof_id_type node_id_Edge2(const dof_id_type i)
