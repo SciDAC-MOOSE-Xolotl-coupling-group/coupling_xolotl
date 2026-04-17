@@ -1,0 +1,33 @@
+{
+    "vizHandler": "dummy",
+    "flux": 4.0e4,
+    "netParam": "0 1 0 50 6",
+    "dimensions": 2,
+#    "gridType": "nonuniform",    
+    "gridParam": "33 625 33 625",
+    "boundary": "1 0",
+    "material": "W100",
+    "customFluxFilePath": "tridyn_D.dat",
+    "initialConc": "V 1 0.0001",
+    "perfHandler": "dummy",
+    "tempParam": 874,
+    "grouping": "3001 4 4",
+    "process": "reaction diff",
+    "petscArgs": [
+        "-ts_dt 1.0e-12",
+        "-ts_adapt_time_step_increase_delay 5",
+        "-snes_force_iteration",
+        "-ts_adapt_clip 0.1,1.1",
+        "-helium_retention -start_stop 0.001",
+        "-ts_max_time 0.1",
+        "-ts_adapt_dt_max 2.0e-3",
+        "-ts_adapt_wnormtype INFINITY",
+        "-ts_max_steps 10000",
+        "-ts_exact_final_time matchstep", 
+        "-fieldsplit_0_pc_type sor -ts_max_snes_failures -1",
+        "-pc_fieldsplit_detect_coupling -ts_monitor", 
+        "-pc_type fieldsplit -fieldsplit_1_pc_type gamg",
+        "-fieldsplit_1_ksp_type gmres -ksp_type fgmres",
+        "-pass_data"
+    ]
+}
