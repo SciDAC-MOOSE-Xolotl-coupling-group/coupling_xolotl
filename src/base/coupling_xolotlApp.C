@@ -34,7 +34,6 @@ void coupling_xolotlApp::createInterface(FileName paramName) {
 	argv[1] = paramName.c_str();
 
 	_interface->initializeXolotl(argc, argv, _comm->get());
-	_interface->setPassingDefectTypes("D V");
 
 	_is_xolotl_app = true;
 }
